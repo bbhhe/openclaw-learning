@@ -6,10 +6,12 @@ import path from 'path';
 import { SkillLoader } from './skill-loader';
 import { limitHistory } from './utils';
 import { MAX_HISTORY_TURNS } from './config';
-import { Scheduler } from './scheduler'; // Import Scheduler
+import { Scheduler } from './scheduler';
+import { ProcessManager } from './process-manager'; // Import ProcessManager
 
 const execAsync = promisify(exec);
-const scheduler = new Scheduler(); // Initialize Scheduler
+const scheduler = new Scheduler();
+const processManager = new ProcessManager(); // Initialize ProcessManager
 
 // 1. 定义工具箱
 const toolsDefinition = [
@@ -17,16 +19,44 @@ const toolsDefinition = [
         type: "function",
         function: {
             name: "exec",
-            description: "Execute a shell command on the host system. Use this to check system status, read files, or run scripts.",
+            description: "Execute a simple shell command (non-interactive). For interactive tasks or background processes, use 'bash'.",
             parameters: {
                 type: "object",
                 properties: {
-                    command: {
-                        type: "string",
-                        description: "The shell command to run (e.g., 'ls -la', 'cat file.txt', 'curl wttr.in')"
-                    }
+                    command: { type: "string" }
                 },
                 required: ["command"]
+            }
+        }
+    },
+    {
+        type: "function",
+        function: {
+            name: "bash",
+            description: "Start a background shell session. Good for long-running tasks or interactive CLIs (like Claude Code). Returns a sessionId.",
+            parameters: {
+                type: "object",
+                properties: {
+                    command: { type: "string", description: "Command to start" },
+                    workdir: { type: "string", description: "Working directory" }
+                },
+                required: ["command"]
+            }
+        }
+    },
+    {
+        type: "function",
+        function: {
+            name: "process",
+            description: "Manage background processes (log, write, kill).",
+            parameters: {
+                type: "object",
+                properties: {
+                    action: { type: "string", enum: ["log", "write", "kill", "list"] },
+                    sessionId: { type: "string" },
+                    data: { type: "string", description: "Data to write to stdin (for action='write')" }
+                },
+                required: ["action"]
             }
         }
     },
@@ -38,14 +68,8 @@ const toolsDefinition = [
             parameters: {
                 type: "object",
                 properties: {
-                    content: {
-                        type: "string",
-                        description: "The text content of the reminder."
-                    },
-                    delaySeconds: {
-                        type: "number",
-                        description: "How many seconds from now to trigger the reminder."
-                    }
+                    content: { type: "string" },
+                    delaySeconds: { type: "number" }
                 },
                 required: ["content", "delaySeconds"]
             }
@@ -64,6 +88,31 @@ async function runTool(name: string, args: any): Promise<string> {
             return `Error: ${error.message}`;
         }
     }
+    
+    if (name === 'bash') {
+        const id = processManager.start(args.command, args.workdir);
+        return `✅ Started background session. ID: ${id}. Use 'process' tool to monitor logs or send input.`;
+    }
+
+    if (name === 'process') {
+        if (args.action === 'list') {
+            return JSON.stringify(processManager.list());
+        }
+        if (!args.sessionId) return "Error: sessionId required for this action.";
+        
+        if (args.action === 'log') {
+            return processManager.getLog(args.sessionId) || "(Empty log)";
+        }
+        if (args.action === 'write') {
+            const ok = processManager.write(args.sessionId, args.data || "");
+            return ok ? "Written to stdin." : "Failed to write (session not found?)";
+        }
+        if (args.action === 'kill') {
+            processManager.kill(args.sessionId);
+            return "Killed.";
+        }
+    }
+
     if (name === 'schedule_reminder') {
         const id = scheduler.addTask(args.content, args.delaySeconds);
         return `✅ Reminder scheduled! ID: ${id}, Content: "${args.content}" in ${args.delaySeconds}s.`;
@@ -79,13 +128,14 @@ const skillLoader = new SkillLoader(path.join(__dirname, 'skills'));
 const skillsPrompt = skillLoader.loadSkills();
 
 const SYSTEM_PROMPT = `You are an Agentic AI assistant.
-You have access to a Linux shell via the 'exec' tool.
+You have access to 'exec' (simple) and 'bash'/'process' (advanced/background).
+Use 'bash' for interactive tools like Claude Code or Codex.
 You can schedule reminders using 'schedule_reminder'.
 Don't make assumptions. If you need info, use 'exec' to find it.
 
 ${skillsPrompt}`;
 
-console.log("🚀 Gateway (With Cron & Main Session) is listening on ws://localhost:8080");
+console.log("🚀 Gateway (With Cron, Process Manager & Main Session) is listening on ws://localhost:8080");
 
 interface Session {
     history: { role: string, content?: string, tool_calls?: any[], tool_call_id?: string, name?: string }[];
