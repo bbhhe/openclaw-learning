@@ -4,6 +4,8 @@ import { exec } from 'child_process';
 import { promisify } from 'util';
 import path from 'path';
 import { SkillLoader } from './skill-loader';
+import { limitHistory } from './utils';
+import { MAX_HISTORY_TURNS } from './config';
 
 const execAsync = promisify(exec);
 
@@ -55,7 +57,7 @@ Don't make assumptions. If you need info, use 'exec' to find it.
 
 ${skillsPrompt}`;
 
-console.log("🚀 Gateway (With Skills!) is listening on ws://localhost:8080");
+console.log("🚀 Gateway (With Context Limit) is listening on ws://localhost:8080");
 
 interface Session {
     history: { role: string, content?: string, tool_calls?: any[], tool_call_id?: string, name?: string }[];
@@ -79,6 +81,16 @@ wss.on('connection', (ws) => {
         
         const session = sessions.get(ws)!;
         session.history.push({ role: 'user', content: text });
+
+        // 核心：在处理之前，先修剪历史记录
+        // 保持 System Prompt 不动，修剪中间的 User/Assistant 消息
+        const beforeLen = session.history.length;
+        session.history = limitHistory(session.history, MAX_HISTORY_TURNS);
+        const afterLen = session.history.length;
+
+        if (beforeLen > afterLen) {
+            console.log(`✂️ History trimmed: ${beforeLen} -> ${afterLen} messages (Max Turns: ${MAX_HISTORY_TURNS})`);
+        }
 
         try {
             await processTurn(ws, session);
