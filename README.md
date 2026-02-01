@@ -1,7 +1,7 @@
 # OpenClaw Learning MVP
 
 这是一个用于学习和构建 Agentic AI 核心架构的最小可行性产品 (MVP)。
-通过本项目，我们从零实现了 OpenClaw 的核心组件：Gateway、Agent、Router、Tools 和 Skill Loader。
+通过本项目，我们从零实现了 OpenClaw 的核心组件：Gateway、Agent、Router、Tools、Scheduler 和 Skill Loader。
 
 ## 🏗 架构设计
 
@@ -9,7 +9,8 @@
 *   **Gateway (The Hub)**: 系统的神经中枢，基于 WebSocket。
 *   **Agent (The Brain)**: 负责思考和生成回复的大脑。
 *   **Router (The Cerebellum)**: 负责高可用模型调度的小脑。
-*   **Tools (The Hands)**: 负责执行操作的双手 (exec)。
+*   **Scheduler (The Clock)**: 负责定时任务和提醒的调度器。
+*   **Tools (The Hands)**: 负责执行操作的双手 (exec, schedule)。
 *   **Skills (The Knowledge)**: 动态加载的技能库 (Prompt Injection)。
 
 ### 数据流向
@@ -21,8 +22,10 @@ graph TD
     Gateway -- 4. 路由 --> Router
     Router -- 5. 调用 API --> LLM
     LLM -- 6. Tool Call --> Gateway
-    Gateway -- 7. Exec --> System[操作系统]
-    System -- 8. 结果 --> Gateway --> LLM
+    Gateway -- 7a. Exec --> System[操作系统]
+    Gateway -- 7b. Schedule --> Scheduler[调度器]
+    Scheduler -- 8a. Trigger --> Gateway
+    System -- 8b. 结果 --> Gateway --> LLM
     LLM -- 9. 最终回复 --> User
 ```
 
@@ -30,7 +33,7 @@ graph TD
 
 ### 1. Gateway (`src/gateway.ts`)
 - 启动 WebSocket Server。
-- 维护 Session 和 History。
+- **Session Management**: 实现了类似 OpenClaw 的 "Main Session" 模式，支持断线重连和上下文保持。[查看文档](./docs/session-management.md)
 - **ReAct Loop**: 处理 "思考-行动-观察" 的递归循环。
 - **Skill Injection**: 启动时注入 `src/skills/` 下的技能。
 
@@ -40,10 +43,14 @@ graph TD
 - **Tool Support**: 支持传递工具定义和处理 `tool_calls`。
 
 ### 3. Skill Loader (`src/skill-loader.ts`)
-- 自动扫描 `src/skills/*.md`。
+- 自动扫描 `src/skills/<name>/skill.md`。
 - 将 Markdown 文件转换为 System Prompt，赋予 Agent 新知识。
 
-### 4. Client (`src/client.ts`)
+### 4. Scheduler (`src/scheduler.ts`)
+- **单一动态定时器**: 高效管理未来的提醒任务。
+- **System Event**: 任务到期时广播消息并注入到聊天历史中。[查看文档](./docs/cron-implementation.md)
+
+### 5. Client (`src/client.ts`)
 - 命令行聊天工具。
 
 ## 🚀 快速开始
@@ -57,7 +64,7 @@ npm install
 编辑 `src/config.ts`，填入你的 LLM API Key。
 
 ### 3. 添加技能 (可选)
-在 `src/skills/` 目录下创建 Markdown 文件（如 `git.md`），写上教 AI 如何使用 `exec` 完成任务的指令。
+在 `src/skills/` 目录下创建子目录和 `skill.md`（如 `src/skills/git/skill.md`），写上教 AI 如何使用 `exec` 完成任务的指令。
 
 ### 4. 启动
 ```bash
@@ -67,6 +74,9 @@ npm run gateway
 # 启动客户端
 npm run client
 ```
+
+### 5. 测试定时任务
+对 AI 说："5秒后提醒我喝水"。
 
 ## 📚 学习路径
 详情请见 [docs/LESSONS.md](./docs/LESSONS.md)。
