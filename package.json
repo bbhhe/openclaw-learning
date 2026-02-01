@@ -5,6 +5,7 @@
   "main": "index.js",
   "scripts": {
     "gateway": "tsx src/gateway.ts",
+    "debug": "DEBUG=true tsx src/gateway.ts",
     "client": "tsx src/client.ts",
     "chat": "tsx src/chat.ts"
   },

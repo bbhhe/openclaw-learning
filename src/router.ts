@@ -1,4 +1,5 @@
 import { modelPool, ModelProvider } from './config';
+import { logger } from './logger';
 
 export class ModelRouter {
     private pool: ModelProvider[] = modelPool;
@@ -8,7 +9,7 @@ export class ModelRouter {
         return this.pool.find(p => {
             if (p.status === 'healthy') return true;
             if (p.status === 'busy' && p.busyUntil && p.busyUntil <= now) {
-                console.log(`[Router] 🔓 Provider ${p.id} rate limit reset!`);
+                logger.info(`[Router] 🔓 Provider ${p.id} rate limit reset!`);
                 p.status = 'healthy';
                 p.busyUntil = undefined;
                 return true;
@@ -18,13 +19,13 @@ export class ModelRouter {
     }
 
     private markAsSick(provider: ModelProvider) {
-        console.warn(`[Router] ⚠️ Provider ${provider.id} is sick.`);
+        logger.warn(`[Router] ⚠️ Provider ${provider.id} is sick.`);
         provider.status = 'sick';
         setTimeout(() => { provider.status = 'healthy'; }, 60000);
     }
 
     private markAsBusy(provider: ModelProvider, cooldownMs: number = 20000) {
-        console.warn(`[Router] ⏳ Provider ${provider.id} rate limited.`);
+        logger.warn(`[Router] ⏳ Provider ${provider.id} rate limited.`);
         provider.status = 'busy';
         provider.busyUntil = Date.now() + cooldownMs;
     }
@@ -44,10 +45,10 @@ export class ModelRouter {
             }
 
             try {
-                console.log(`[Router] 🔄 Attempt ${attempt} using ${provider.id}...`);
+                logger.info(`[Router] 🔄 Attempt ${attempt} using ${provider.id}...`);
                 return await this.callProvider(provider, messages, tools);
             } catch (error: any) {
-                console.error(`[Router] ❌ Failed: ${error.message}`);
+                logger.error(`[Router] ❌ Failed: ${error.message}`);
                 lastError = error;
                 if (error.message.includes('RATE_LIMIT')) this.markAsBusy(provider);
                 else this.markAsSick(provider);
@@ -66,25 +67,43 @@ export class ModelRouter {
             stream: false
         };
 
-        // 如果有工具，就带上
         if (tools && tools.length > 0) {
             payload.tools = tools;
         }
 
-        const res = await fetch(url, {
-            method: 'POST',
-            headers: {
-                'Content-Type': 'application/json',
-                'Authorization': `Bearer ${provider.apiKey}`
-            },
-            body: JSON.stringify(payload)
-        });
+        logger.debug(`[API Request] URL: ${url}`);
+        // 不要打印完整的 payload，因为可能有敏感信息或太长，只打印关键信息
+        logger.debug(`[API Request] Model: ${provider.modelName}, MsgCount: ${messages.length}`);
 
-        if (res.status === 429) throw new Error(`RATE_LIMIT`);
-        if (!res.ok) throw new Error(`API Error ${res.status}: ${await res.text()}`);
+        const controller = new AbortController();
+        const timeoutId = setTimeout(() => controller.abort(), 60000); // 60秒超时
 
-        const data: any = await res.json();
-        // 返回完整的 message 对象 (content + tool_calls)
-        return data.choices[0]?.message;
+        try {
+            const start = Date.now();
+            const res = await fetch(url, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'Authorization': `Bearer ${provider.apiKey}`
+                },
+                body: JSON.stringify(payload),
+                signal: controller.signal
+            });
+            const duration = Date.now() - start;
+            logger.debug(`[API Response] Status: ${res.status}, Time: ${duration}ms`);
+
+            if (res.status === 429) throw new Error(`RATE_LIMIT`);
+            if (!res.ok) throw new Error(`API Error ${res.status}: ${await res.text()}`);
+
+            const data: any = await res.json();
+            return data.choices[0]?.message;
+        } catch (err: any) {
+             if (err.name === 'AbortError') {
+                throw new Error(`Request timeout (60s)`);
+            }
+            throw err;
+        } finally {
+            clearTimeout(timeoutId);
+        }
     }
 }
