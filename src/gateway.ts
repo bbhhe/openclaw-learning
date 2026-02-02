@@ -18,7 +18,7 @@ const processManager = new ProcessManager();
 // --- Express & HTTP Setup ---
 const app = express();
 const server = http.createServer(app);
-const PORT = parseInt(process.env.PORT || "3000", 10);
+const PORT = parseInt(process.env.PORT || "31004", 10);
 
 app.use(express.json()); // Enable JSON body parsing
 
