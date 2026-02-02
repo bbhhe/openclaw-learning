@@ -57,6 +57,86 @@ export class ModelRouter {
         throw lastError;
     }
 
+    // 新增: 流式对话方法
+    async *chatStream(messages: any[], tools?: any[]): AsyncGenerator<string, void, unknown> {
+        const MAX_RETRIES = 5;
+        let lastError: Error | null = null;
+
+        for (let attempt = 1; attempt <= MAX_RETRIES; attempt++) {
+            const provider = this.getHealthyProvider();
+            
+            if (!provider) {
+                const anyBusy = this.pool.some(p => p.status === 'busy');
+                if (anyBusy) throw new Error("🔥 All providers are busy.");
+                throw new Error("🔥 All providers are down!");
+            }
+
+            try {
+                logger.info(`[Router] 🔄 Stream Attempt ${attempt} using ${provider.id}...`);
+                // 调用流式接口
+                yield* this.callProviderStream(provider, messages, tools);
+                return;
+            } catch (error: any) {
+                logger.error(`[Router] ❌ Stream Failed: ${error.message}`);
+                lastError = error;
+                if (error.message.includes('RATE_LIMIT')) this.markAsBusy(provider);
+                else this.markAsSick(provider);
+            }
+        }
+        throw lastError;
+    }
+
+    private async *callProviderStream(provider: ModelProvider, messages: any[], tools?: any[]): AsyncGenerator<string, void, unknown> {
+        const url = `${provider.baseUrl.replace(/\/+$/, '')}/chat/completions`;
+        const payload: any = {
+            model: provider.modelName,
+            messages: messages,
+            stream: true // 开启流式
+        };
+        if (tools && tools.length > 0) payload.tools = tools;
+
+        const res = await fetch(url, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'Authorization': `Bearer ${provider.apiKey}`
+            },
+            body: JSON.stringify(payload)
+        });
+
+        if (res.status === 429) throw new Error(`RATE_LIMIT`);
+        if (!res.ok) throw new Error(`API Error ${res.status}`);
+        if (!res.body) throw new Error("No response body");
+
+        const reader = res.body.getReader();
+        const decoder = new TextDecoder("utf-8");
+        let buffer = "";
+
+        while (true) {
+            const { done, value } = await reader.read();
+            if (done) break;
+            
+            buffer += decoder.decode(value, { stream: true });
+            const lines = buffer.split('\n');
+            buffer = lines.pop() || ""; // 保留未完整的行
+
+            for (const line of lines) {
+                const trimmed = line.trim();
+                if (!trimmed.startsWith("data: ")) continue;
+                const dataStr = trimmed.slice(6);
+                if (dataStr === "[DONE]") return;
+
+                try {
+                    const json = JSON.parse(dataStr);
+                    const content = json.choices[0]?.delta?.content || "";
+                    if (content) yield content;
+                } catch (e) {
+                    // Ignore parse errors for partial chunks
+                }
+            }
+        }
+    }
+
     // 修改点 2: 传递 tools
     private async callProvider(provider: ModelProvider, messages: any[], tools?: any[]): Promise<any> {
         const url = `${provider.baseUrl.replace(/\/+$/, '')}/chat/completions`;

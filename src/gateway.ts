@@ -20,8 +20,38 @@ const app = express();
 const server = http.createServer(app);
 const PORT = 3000;
 
+app.use(express.json()); // Enable JSON body parsing
 // Serve static files (HTML/CSS/JS)
 app.use(express.static(path.join(__dirname, 'web/public')));
+
+// --- SSE Endpoint ---
+app.post('/api/chat/sse', async (req, res) => {
+    const { messages } = req.body;
+    
+    if (!messages || !Array.isArray(messages)) {
+        return res.status(400).json({ error: "messages array required" });
+    }
+
+    res.setHeader('Content-Type', 'text/event-stream');
+    res.setHeader('Cache-Control', 'no-cache');
+    res.setHeader('Connection', 'keep-alive');
+
+    try {
+        // Assume 'router' is globally available or we get it here
+        // For tools, we currently don't support tools in SSE simple mode yet, or we can pass toolsDefinition
+        // But streaming tools is complex (need to buffer tool calls). 
+        // For this MVP, let's start with pure text streaming (no tools).
+        for await (const chunk of router.chatStream(messages)) {
+            res.write(`data: ${JSON.stringify({ content: chunk })}\n\n`);
+        }
+        res.write('data: [DONE]\n\n');
+    } catch (error: any) {
+        console.error("SSE Error:", error);
+        res.write(`data: ${JSON.stringify({ error: error.message })}\n\n`);
+    } finally {
+        res.end();
+    }
+});
 
 // --- WebSocket Setup ---
 // Bind WS to the HTTP server
