@@ -21,6 +21,12 @@ const server = http.createServer(app);
 const PORT = parseInt(process.env.PORT || "3000", 10);
 
 app.use(express.json()); // Enable JSON body parsing
+
+// --- Health Check ---
+app.get('/', (req, res) => {
+    res.send('OpenClaw Learning Gateway is running! 🚀');
+});
+
 // Serve static files (HTML/CSS/JS)
 app.use(express.static(path.join(__dirname, 'web/public')));
 
