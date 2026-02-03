@@ -12,6 +12,7 @@ export interface WorkspaceConfig {
   workspacePath: string;
   models: ModelConfig[]; // Array of models
   defaultModel?: string; // Optional: name of the default model to use
+  debug?: boolean; // Enable debug mode logging
 }
 
 export class ConfigLoader {

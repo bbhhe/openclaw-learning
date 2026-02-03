@@ -16,6 +16,7 @@ import { ProcessManager } from './process-manager';
 import { ConfigLoader } from './config-loader';
 import { SystemPromptBuilder } from './system-prompt';
 import { SessionManager } from './session-manager';
+import { setDebug, logger } from './logger';
 
 const execAsync = promisify(exec);
 const scheduler = new Scheduler();
@@ -34,18 +35,23 @@ if (process.env.OPENCLAW_DEV === 'true') {
 if (!fs.existsSync(workspacePath)) {
     try {
         fs.mkdirSync(workspacePath, { recursive: true });
-        console.log(`[Init] Created workspace: ${workspacePath}`);
+        logger.info(`[Init] Created workspace: ${workspacePath}`);
     } catch (e) {
-        console.error(`[Init] Failed to create workspace: ${e}`);
+        logger.error(`[Init] Failed to create workspace: ${e}`);
         process.exit(1);
     }
 }
 
-console.log(`[Init] Using workspace: ${workspacePath}`);
+logger.info(`[Init] Using workspace: ${workspacePath}`);
 
 // Initialize Components
 const configLoader = new ConfigLoader(workspacePath);
 const config = configLoader.getConfig();
+
+if (config.debug) {
+    setDebug(true);
+    logger.debug("Debug mode enabled via config");
+}
 
 const sessionManager = new SessionManager(workspacePath); // Will look in workspace/sessions
 const systemPromptBuilder = new SystemPromptBuilder(workspacePath);
@@ -77,7 +83,7 @@ function seedIdentityFiles() {
             const src = path.join(process.cwd(), file);
             if (fs.existsSync(src)) {
                 fs.copyFileSync(src, dest);
-                console.log(`[Init] Seeded ${file} to workspace.`);
+                logger.info(`[Init] Seeded ${file} to workspace.`);
             }
         }
     }
@@ -164,6 +170,7 @@ const toolsDefinition = [
 ];
 
 async function runTool(name: string, args: any): Promise<string> {
+    logger.debug(`Executing tool: ${name}`, args);
     if (name === 'exec') {
         try {
             const { stdout, stderr } = await execAsync(args.command);
@@ -210,7 +217,7 @@ scheduler.on('trigger', (task) => {
 });
 
 wss.on('connection', async (ws) => {
-    console.log("🔌 New connection established");
+    logger.info("🔌 New connection established");
     const sessionKey = "main";
     
     // Load history from disk
@@ -246,7 +253,8 @@ wss.on('connection', async (ws) => {
             if (json.type === 'message') text = json.content;
         } catch (e) {}
 
-        console.log(`👂 User: ${text}`);
+        logger.info(`👂 User: ${text}`);
+        logger.debug(`Raw message received: ${rawMessage}`);
         
         const userMsg = { role: 'user', content: text };
         sessionManager.appendMessage(sessionKey, userMsg);
@@ -301,6 +309,6 @@ async function processTurn(ws: WebSocket, sessionKey: string, history: any[]) {
 }
 
 server.listen(PORT, () => {
-    console.log(`🚀 Gateway running on http://localhost:${PORT}`);
-    console.log(`📂 Workspace: ${workspacePath}`);
+    logger.info(`🚀 Gateway running on http://localhost:${PORT}`);
+    logger.info(`📂 Workspace: ${workspacePath}`);
 });

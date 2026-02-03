@@ -5,7 +5,11 @@ export const LogLevel = {
     DEBUG: 'DEBUG'
 };
 
-const isDebug = process.env.DEBUG === 'true';
+let isDebug = process.env.DEBUG === 'true';
+
+export const setDebug = (enabled: boolean) => {
+    isDebug = enabled;
+};
 
 export const logger = {
     info: (msg: string, ...args: any[]) => {
