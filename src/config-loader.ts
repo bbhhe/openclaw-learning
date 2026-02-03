@@ -35,7 +35,21 @@ export class ConfigLoader {
     };
 
     if (!fs.existsSync(this.configPath)) {
-      console.warn(`Config file not found at ${this.configPath}. Using default config.`);
+      console.log(`Config file not found. Initializing default workspace at ${workspacePath}`);
+      
+      try {
+        // Ensure workspace directory exists
+        if (!fs.existsSync(workspacePath)) {
+            fs.mkdirSync(workspacePath, { recursive: true });
+        }
+
+        // Write default config to file
+        fs.writeFileSync(this.configPath, JSON.stringify(defaultConfig, null, 2), 'utf-8');
+        console.log(`✅ Created default config at ${this.configPath}`);
+      } catch (err) {
+        console.error(`Failed to initialize workspace:`, err);
+      }
+
       return defaultConfig;
     }
 
