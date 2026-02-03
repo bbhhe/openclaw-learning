@@ -5,7 +5,7 @@
   "main": "index.js",
   "scripts": {
     "gateway": "tsx src/gateway.ts",
-    "debug": "DEBUG=true tsx src/gateway.ts",
+    "debug": "cross-env DEBUG=true tsx src/gateway.ts",
     "client": "tsx src/client.ts",
     "chat": "tsx src/chat.ts",
     "test": "vitest run"
@@ -20,6 +20,7 @@
     "@types/express": "^5.0.6",
     "@types/node": "^22.19.7",
     "@types/ws": "^8.18.1",
+    "cross-env": "^10.1.0",
     "express": "^5.2.1",
     "tsx": "^4.21.0",
     "typescript": "^5.9.3",

@@ -1,9 +1,0 @@
-{
-  "workspacePath": "/home/binbin/workSpace/openclaw-learning/workspace",
-  "model": {
-    "provider": "custom",
-    "baseUrl": "https://api.example.com/v1",
-    "apiKey": "your-api-key-here",
-    "modelName": "model-name-here"
-  }
-}
