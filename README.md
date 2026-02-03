@@ -36,9 +36,10 @@ graph TD
 
 ### 1. Gateway (`src/gateway.ts`)
 - 启动 WebSocket Server。
-- **Session Management**: 实现了类似 OpenClaw 的 "Main Session" 模式，支持断线重连和上下文保持。[查看文档](./docs/session-management.md)
+- **Session Persistence**: 支持会话持久化，所有对话记录自动保存到 `~/.openclaw-learning/sessions/`。
 - **ReAct Loop**: 处理 "思考-行动-观察" 的递归循环。
-- **Skill Injection**: 启动时注入 `src/skills/` 下的技能。
+- **Skill Injection**: 启动时注入 `src/skills/`（内置）和 `~/.openclaw-learning/skills/`（用户）下的技能。
+- **Memory Loading**: 自动加载 `MEMORY.md` 作为长期记忆。
 
 ### 2. Model Router (`src/router.ts`)
 - **高可用**: 维护模型池，支持故障切换 (Failover)。
@@ -67,11 +68,17 @@ graph TD
 npm install
 ```
 
-### 2. 配置 API Key
-编辑 `src/config.ts`，填入你的 LLM API Key。
+### 2. 运行环境配置
+项目启动时会自动在 `~/.openclaw-learning/` 创建默认工作空间。
+- **config.json**: 配置文件。
+- **sessions/**: 对话历史记录。
+- **skills/**: 用户自定义技能。
+
+若需开发调试，可设置环境变量 `OPENCLAW_DEV=true` 以使用本地 workspace 目录。
 
 ### 3. 添加技能 (可选)
-在 `src/skills/` 目录下创建子目录和 `skill.md`（如 `src/skills/git/skill.md`），写上教 AI 如何使用 `exec` 完成任务的指令。
+- **手动添加**: 在 `~/.openclaw-learning/skills/` 下创建目录和 `skill.md`。
+- **自动添加**: 直接告诉 Agent "帮我创建一个xxx技能"，它会使用内置的 `skill-creator` 技能自动生成。
 
 ### 4. 启动
 ```bash
@@ -94,6 +101,12 @@ http://localhost:31004
 
 ### 6. 测试后台进程
 对 AI 说："在后台运行 ping 百度"。
+
+### 7. 运行测试
+```bash
+npm test
+```
+本项目包含完整的单元测试，覆盖了 Gateway、SessionManager、SkillLoader 等核心组件。
 
 ## 📚 学习路径
 详情请见 [docs/LESSONS.md](./docs/LESSONS.md)。
