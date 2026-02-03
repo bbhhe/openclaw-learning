@@ -83,7 +83,7 @@ npm run client
 
 ### 4.1 启动 Web 客户端 (新增)
 启动 Gateway 后，直接浏览器访问：
-http://localhost:3000
+http://localhost:31004
 
 即可使用类似微信的网页版聊天界面。
 

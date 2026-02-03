@@ -22,13 +22,13 @@ const PORT = parseInt(process.env.PORT || "31004", 10);
 
 app.use(express.json()); // Enable JSON body parsing
 
-// --- Health Check ---
-app.get('/', (req, res) => {
-    res.send('OpenClaw Learning Gateway is running! 🚀');
-});
-
 // Serve static files (HTML/CSS/JS)
 app.use(express.static(path.join(__dirname, 'web/public')));
+
+// --- Health Check ---
+app.get('/health', (req, res) => {
+    res.send('OpenClaw Learning Gateway is running! 🚀');
+});
 
 // --- SSE Endpoint ---
 app.post('/api/chat/sse', async (req, res) => {

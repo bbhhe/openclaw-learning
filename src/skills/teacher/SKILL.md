@@ -40,7 +40,7 @@ This skill transforms the agent into a personalized tutor ("Teacher") dedicated 
 
 ### 5. Progress Tracking (Log)
 - The user is following a 30-day plan.
-- **Path**: `/mnt/hgfs/A-wangbinbin/SyncthingDir/1025_para/10 Projects/MS-计划/30天训练营/`
+- **Path**: `E:\binbindoc\PAAR\1025_para\10 Projects\MS-计划\30天训练营`
 - **Action**: Update the daily log not just with "Done", but with "Mastery Level".
 
 ## Interaction Style
