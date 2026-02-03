@@ -35,16 +35,16 @@ describe('ConfigLoader', () => {
 
     // Verify returned config is default
     expect(config.workspacePath).toBe(mockWorkspacePath);
-    expect(config.model.provider).toBe('custom');
+    expect(config.models[0].provider).toBe('custom');
   });
 
   it('should load existing config if file exists', () => {
     const userConfig = {
-      model: {
+      models: [{
         provider: 'openai',
         apiKey: 'test-key',
         modelName: 'gpt-4',
-      },
+      }],
     };
 
     // Setup mocks
@@ -55,10 +55,31 @@ describe('ConfigLoader', () => {
     const config = loader.getConfig();
 
     expect(fs.readFileSync).toHaveBeenCalledWith(mockConfigPath, 'utf-8');
-    expect(config.model.provider).toBe('openai');
-    expect(config.model.apiKey).toBe('test-key');
+    expect(config.models[0].provider).toBe('openai');
+    expect(config.models[0].apiKey).toBe('test-key');
     // Verify it merges with default keys if missing (though here we provided full model object, 
     // but top level structure is merged)
+  });
+
+  it('should handle legacy config format', () => {
+    const legacyConfig = {
+      model: {
+        provider: 'legacy-provider',
+        apiKey: 'legacy-key',
+        modelName: 'legacy-model',
+      },
+    };
+
+    // Setup mocks
+    vi.mocked(fs.existsSync).mockReturnValue(true);
+    vi.mocked(fs.readFileSync).mockReturnValue(JSON.stringify(legacyConfig));
+
+    const loader = new ConfigLoader(mockWorkspacePath);
+    const config = loader.getConfig();
+
+    expect(config.models).toHaveLength(1);
+    expect(config.models[0].provider).toBe('legacy-provider');
+    expect(config.models[0].apiKey).toBe('legacy-key');
   });
 
   it('should handle JSON parse error and return default', () => {
@@ -70,7 +91,7 @@ describe('ConfigLoader', () => {
     const loader = new ConfigLoader(mockWorkspacePath);
     const config = loader.getConfig();
 
-    expect(config.model.provider).toBe('custom'); // Fallback to default
+    expect(config.models[0].provider).toBe('custom'); // Fallback to default
     expect(consoleSpy).toHaveBeenCalled();
   });
 
@@ -82,12 +103,12 @@ describe('ConfigLoader', () => {
     // Change fs state to simulate file update
     vi.mocked(fs.existsSync).mockReturnValue(true);
     vi.mocked(fs.readFileSync).mockReturnValue(JSON.stringify({
-      model: { provider: 'updated', apiKey: 'new', modelName: 'new' }
+      models: [{ provider: 'updated', apiKey: 'new', modelName: 'new' }]
     }));
 
     loader.reloadConfig();
     const newConfig = loader.getConfig();
 
-    expect(newConfig.model.provider).toBe('updated');
+    expect(newConfig.models[0].provider).toBe('updated');
   });
 });

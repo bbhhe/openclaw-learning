@@ -20,12 +20,12 @@ describe('ModelRouter', () => {
         // Mock getConfig to return a test config
         vi.spyOn(configLoader, 'getConfig').mockReturnValue({
             workspacePath: workspacePath,
-            model: {
+            models: [{
                 provider: 'test-provider',
                 baseUrl: 'https://api.test.com/v1',
                 apiKey: 'test-key',
                 modelName: 'test-model'
-            }
+            }]
         });
 
         router = new ModelRouter(configLoader);
