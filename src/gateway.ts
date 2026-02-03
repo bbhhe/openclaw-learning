@@ -54,7 +54,18 @@ const systemPromptBuilder = new SystemPromptBuilder(workspacePath);
 const internalSkills = path.join(__dirname, 'skills');
 const externalSkills = path.join(workspacePath, 'skills');
 const skillLoader = new SkillLoader([internalSkills, externalSkills]);
-const skillsPrompt = skillLoader.loadSkills();
+const skillsMap = skillLoader.loadSkills();
+
+// Convert Map to String for Prompt
+let skillsPrompt = "";
+for (const [name, skill] of skillsMap.entries()) {
+    try {
+        const skillContent = fs.readFileSync(path.join(skill.path, 'SKILL.md'), 'utf-8');
+        skillsPrompt += `\n### Skill: ${name}\n${skillContent}\n`;
+    } catch (e) {
+        console.warn(`[Gateway] Failed to read SKILL.md for ${name}`);
+    }
+}
 
 // Ensure Identity Files Exist (Seed from Repo if missing)
 function seedIdentityFiles() {
@@ -251,16 +262,21 @@ wss.on('connection', async (ws) => {
 });
 
 async function processTurn(ws: WebSocket, sessionKey: string, history: any[]) {
+    console.log(`[ProcessTurn] Processing turn with history length: ${history.length}`);
     const responseMsg = await router.chat(history, toolsDefinition);
+    console.log(`[ProcessTurn] Raw Response:`, JSON.stringify(responseMsg, null, 2));
     
     sessionManager.appendMessage(sessionKey, responseMsg);
     history.push(responseMsg);
 
     if (responseMsg.tool_calls && responseMsg.tool_calls.length > 0) {
+        console.log(`[ProcessTurn] Detected ${responseMsg.tool_calls.length} tool calls.`);
         for (const toolCall of responseMsg.tool_calls) {
             const fnName = toolCall.function.name;
             const args = JSON.parse(toolCall.function.arguments);
+            console.log(`[ProcessTurn] Executing tool: ${fnName} with args:`, args);
             const result = await runTool(fnName, args);
+            console.log(`[ProcessTurn] Tool result: ${result.substring(0, 50)}...`);
             
             const toolMsg = {
                 role: 'tool',
@@ -277,7 +293,10 @@ async function processTurn(ws: WebSocket, sessionKey: string, history: any[]) {
     }
 
     if (responseMsg.content) {
+        console.log(`[ProcessTurn] Sending content to client: ${responseMsg.content.substring(0, 50)}...`);
         ws.send(JSON.stringify({ type: 'message', content: responseMsg.content }));
+    } else {
+        console.log(`[ProcessTurn] No content to send.`);
     }
 }
 

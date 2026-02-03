@@ -20,9 +20,17 @@ function connect() {
     };
     ws.onmessage = (event) => {
         try {
+            console.log("Received WS message:", event.data);
             const data = JSON.parse(event.data);
-            if (data.type === 'system') appendMessage(data.content, 'system');
-        } catch (e) {}
+            if (data.type === 'system') {
+                appendMessage(data.content, 'system');
+            } else if (data.type === 'message') {
+                appendMessage(data.content, 'bot');
+                conversationHistory.push({ role: 'assistant', content: data.content });
+            }
+        } catch (e) {
+            console.error("Error processing WS message:", e);
+        }
     };
     ws.onclose = () => {
         statusEl.className = 'disconnected';
@@ -50,49 +58,11 @@ async function sendMessage() {
     conversationHistory.push({ role: 'user', content: text });
     messageInput.value = '';
 
-    // 2. Create Bot Placeholder
-    const botMsgDiv = appendMessage('...', 'bot');
-    botMsgDiv.innerText = ''; // Clear placeholder
-    let botText = "";
-
-    try {
-        // 3. Call SSE Endpoint
-        const response = await fetch('/api/chat/sse', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ messages: conversationHistory })
-        });
-
-        const reader = response.body.getReader();
-        const decoder = new TextDecoder();
-
-        while (true) {
-            const { done, value } = await reader.read();
-            if (done) break;
-            
-            const chunk = decoder.decode(value);
-            const lines = chunk.split('\n');
-            
-            for (const line of lines) {
-                if (line.startsWith('data: ')) {
-                    const dataStr = line.slice(6);
-                    if (dataStr === '[DONE]') break;
-                    try {
-                        const json = JSON.parse(dataStr);
-                        if (json.content) {
-                            botText += json.content;
-                            botMsgDiv.innerText = botText;
-                            chatContainer.scrollTop = chatContainer.scrollHeight;
-                        }
-                    } catch (e) {}
-                }
-            }
-        }
-        // 4. Update History
-        conversationHistory.push({ role: 'assistant', content: botText });
-
-    } catch (err) {
-        botMsgDiv.innerText = `Error: ${err.message}`;
+    // 2. Send via WebSocket
+    if (ws && ws.readyState === WebSocket.OPEN) {
+        ws.send(JSON.stringify({ type: 'message', content: text }));
+    } else {
+        appendMessage("Error: WebSocket not connected", 'system');
     }
 }
 

@@ -180,6 +180,11 @@ export class ModelRouter {
 
         logger.debug(`[API Request] URL: ${url}`);
         logger.debug(`[API Request] Model: ${provider.modelName}, MsgCount: ${messages.length}`);
+        
+        // Detailed Request Payload Logging
+        if (process.env.DEBUG === 'true') {
+            console.log(`[API Request Payload]`, JSON.stringify(payload, null, 2));
+        }
 
         const controller = new AbortController();
         const timeoutId = setTimeout(() => controller.abort(), 60000);
@@ -202,6 +207,12 @@ export class ModelRouter {
             if (!res.ok) throw new Error(`API Error ${res.status}: ${await res.text()}`);
 
             const data: any = await res.json();
+            
+            // Detailed Response Data Logging
+            if (process.env.DEBUG === 'true') {
+                console.log(`[API Response Data]`, JSON.stringify(data, null, 2));
+            }
+            
             return data.choices[0]?.message;
         } catch (err: any) {
              if (err.name === 'AbortError') {
