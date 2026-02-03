@@ -1,5 +1,6 @@
 import express from 'express';
 import http from 'http';
+import fs from 'fs';
 import { WebSocketServer, WebSocket } from 'ws';
 import { ModelRouter } from './router';
 import { exec } from 'child_process';
@@ -18,9 +19,14 @@ const scheduler = new Scheduler();
 const processManager = new ProcessManager();
 
 // --- Configuration & System Prompt ---
-// Initialize ConfigLoader (default workspace: ~/.openclaw-learning)
-const userHome = process.env.HOME || process.cwd();
-const workspacePath = path.join(userHome, '.openclaw-learning');
+// Initialize ConfigLoader
+// Priority: Custom Env Var -> Local Workspace -> Home Directory
+const localWorkspace = path.join(process.cwd(), 'workspace');
+const homeWorkspace = path.join(process.env.HOME || process.cwd(), '.openclaw-learning');
+const workspacePath = fs.existsSync(localWorkspace) ? localWorkspace : homeWorkspace;
+
+console.log(`[Init] Using workspace: ${workspacePath}`);
+
 const configLoader = new ConfigLoader(workspacePath);
 const config = configLoader.getConfig();
 
@@ -204,9 +210,11 @@ wss.on('connection', (ws) => {
         session = { history: [{ role: 'system', content: currentSystemPrompt }] };
         sessions.set(sessionKey, session);
     } else {
-        // Update the system prompt if it's the first message
-        if (session.history.length > 0 && session.history[0].role === 'system') {
-             session.history[0].content = currentSystemPrompt;
+        // Ensure system prompt is fresh and at index 0
+        if (session.history.length === 0 || session.history[0].role !== 'system') {
+            session.history.unshift({ role: 'system', content: currentSystemPrompt });
+        } else {
+            session.history[0].content = currentSystemPrompt;
         }
         
         const lastMsg = session.history[session.history.length - 1];

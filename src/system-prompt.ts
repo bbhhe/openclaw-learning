@@ -31,6 +31,7 @@ ${runtimeInfo}
     if (fs.existsSync(filePath)) {
       return fs.readFileSync(filePath, 'utf-8');
     }
+    console.warn(`[SystemPrompt] Warning: File not found: ${filePath}`);
     return null;
   }
 

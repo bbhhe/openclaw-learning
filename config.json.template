@@ -1,8 +1,17 @@
 {
-  "model": {
-    "provider": "custom",
-    "baseUrl": "https://api.openai.com/v1",
-    "apiKey": "sk-...",
-    "modelName": "gpt-4-turbo"
-  }
+  "models": [
+    {
+      "provider": "openai",
+      "baseUrl": "https://api.openai.com/v1",
+      "apiKey": "sk-...",
+      "modelName": "gpt-4-turbo"
+    },
+    {
+      "provider": "anthropic",
+      "baseUrl": "https://api.anthropic.com/v1",
+      "apiKey": "sk-...",
+      "modelName": "claude-3-opus-20240229"
+    }
+  ],
+  "defaultModel": "gpt-4-turbo"
 }

@@ -13,18 +13,26 @@ export class ModelRouter {
 
     public reloadConfig() {
         const config = this.configLoader.getConfig();
-        const modelConfig = config.model;
+        const models = config.models || [];
 
-        // Map the single model config to the pool format
-        // In the future, we could support an array of models in config.json
-        this.pool = [{
-            id: modelConfig.provider,
-            baseUrl: modelConfig.baseUrl || 'https://api.openai.com/v1',
-            apiKey: modelConfig.apiKey,
-            modelName: modelConfig.modelName,
+        this.pool = models.map((m: any) => ({
+            id: m.provider,
+            baseUrl: m.baseUrl || 'https://api.openai.com/v1',
+            apiKey: m.apiKey,
+            modelName: m.modelName,
             status: 'healthy'
-        }];
-        logger.info(`[Router] Loaded model configuration for provider: ${modelConfig.provider}`);
+        }));
+
+        // Prioritize default model if set
+        if (config.defaultModel) {
+            this.pool.sort((a, b) => {
+                if (a.modelName === config.defaultModel) return -1;
+                if (b.modelName === config.defaultModel) return 1;
+                return 0;
+            });
+        }
+        
+        logger.info(`[Router] Loaded ${this.pool.length} models.`);
     }
 
     private getHealthyProvider(): ModelProvider | null {
