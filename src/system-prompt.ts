@@ -13,25 +13,30 @@ export class SystemPromptBuilder {
     const soul = this.readFile('SOUL.md') || 'You are a helpful AI assistant.';
     const agents = this.readFile('AGENTS.md') || '';
     
+    const memoryContent = this.readFile('MEMORY.md', true);
+    const memorySection = memoryContent ? `\n\n## Memory\n${memoryContent}` : '';
+
     // Runtime information
     const runtimeInfo = this.getRuntimeInfo();
 
     return `
 ${soul}
 
-${agents}
+${agents}${memorySection}
 
 ## Runtime Context
 ${runtimeInfo}
     `.trim();
   }
 
-  private readFile(filename: string): string | null {
+  private readFile(filename: string, silent: boolean = false): string | null {
     const filePath = path.join(this.workspacePath, filename);
     if (fs.existsSync(filePath)) {
       return fs.readFileSync(filePath, 'utf-8');
     }
-    console.warn(`[SystemPrompt] Warning: File not found: ${filePath}`);
+    if (!silent) {
+      console.warn(`[SystemPrompt] Warning: File not found: ${filePath}`);
+    }
     return null;
   }
 
