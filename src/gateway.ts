@@ -279,5 +279,6 @@ server.listen(PORT, () => {
     console.log(`🚀 Gateway running on http://localhost:${PORT}`);
     console.log(`📡 WebSocket ready on ws://localhost:${PORT}`);
     console.log(`📂 Workspace: ${config.workspacePath}`);
-    console.log(`🤖 Model: ${config.model.modelName} (${config.model.provider})`);
+    const defaultModel = config.models && config.models.length > 0 ? config.models[0] : { modelName: 'Unknown', provider: 'Unknown' };
+    console.log(`🤖 Model: ${defaultModel.modelName} (${defaultModel.provider})`);
 });
