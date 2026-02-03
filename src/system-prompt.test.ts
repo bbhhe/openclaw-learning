@@ -1,62 +1,38 @@
-import { describe, it, expect, vi, beforeEach, afterAll } from 'vitest';
+import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 import { SystemPromptBuilder } from './system-prompt';
 import * as fs from 'fs';
 import * as path from 'path';
-
-vi.mock('fs');
+import * as os from 'os';
 
 describe('SystemPromptBuilder', () => {
-  const mockWorkspacePath = '/mock/workspace';
+  let tempDir: string;
+  let promptBuilder: SystemPromptBuilder;
 
   beforeEach(() => {
-    vi.resetAllMocks();
+    tempDir = fs.mkdtempSync(path.join(os.tmpdir(), 'prompt-test-'));
+    promptBuilder = new SystemPromptBuilder(tempDir);
   });
 
-  afterAll(() => {
-    vi.useRealTimers();
+  afterEach(() => {
+    fs.rmSync(tempDir, { recursive: true, force: true });
   });
 
-  it('should build prompt with default fallback when files are missing', () => {
-    vi.mocked(fs.existsSync).mockReturnValue(false);
-
-    const builder = new SystemPromptBuilder(mockWorkspacePath);
-    const prompt = builder.buildPrompt();
-
-    expect(prompt).toContain('You are a helpful AI assistant.'); // Default SOUL
-    expect(prompt).toContain('## Runtime Context');
+  it('should return base prompt unchanged if MEMORY.md is missing', () => {
+    const base = 'You are a bot.';
+    const result = promptBuilder.buildPrompt(base);
+    expect(result).toBe(base);
   });
 
-  it('should include content from SOUL.md and AGENTS.md', () => {
-    vi.mocked(fs.existsSync).mockImplementation((p) => {
-      const pStr = p.toString();
-      return pStr.endsWith('SOUL.md') || pStr.endsWith('AGENTS.md');
-    });
-
-    vi.mocked(fs.readFileSync).mockImplementation((p) => {
-      const pStr = p.toString();
-      if (pStr.endsWith('SOUL.md')) return 'Custom Soul Content';
-      if (pStr.endsWith('AGENTS.md')) return 'Agent Rules Here';
-      return '';
-    });
-
-    const builder = new SystemPromptBuilder(mockWorkspacePath);
-    const prompt = builder.buildPrompt();
-
-    expect(prompt).toContain('Custom Soul Content');
-    expect(prompt).toContain('Agent Rules Here');
-  });
-
-  it('should include correct runtime info', () => {
-    // Mock Date
-    const mockDate = new Date('2023-10-10T12:00:00Z');
-    vi.useFakeTimers();
-    vi.setSystemTime(mockDate);
-
-    const builder = new SystemPromptBuilder(mockWorkspacePath);
-    const prompt = builder.buildPrompt();
-
-    expect(prompt).toContain('Date: 2023-10-10');
-    // Note: Time might vary based on timezone in test env, but we can check structure
-    expect(prompt).toContain(`Workspace: ${mockWorkspacePath}`);
+  it('should append MEMORY.md content if it exists', () => {
+    const base = 'You are a bot.';
+    const memoryContent = '- User likes pizza.';
+    
+    fs.writeFileSync(path.join(tempDir, 'MEMORY.md'), memoryContent, 'utf8');
+    
+    const result = promptBuilder.buildPrompt(base);
+    
+    expect(result).toContain(base);
+    expect(result).toContain('## Long-Term Memory (MEMORY.md)');
+    expect(result).toContain(memoryContent);
   });
 });

@@ -1,37 +1,53 @@
-import fs from 'fs';
-import path from 'path';
+import * as fs from 'fs';
+import * as path from 'path';
+
+export interface Skill {
+  name: string;
+  path: string;
+  source: string;
+}
 
 export class SkillLoader {
-    private skillsDir: string;
+  private directories: string[];
 
-    constructor(dir: string) {
-        this.skillsDir = dir;
-    }
+  constructor(directories: string[]) {
+    this.directories = directories;
+  }
 
-    loadSkills(): string {
-        if (!fs.existsSync(this.skillsDir)) {
-            console.warn(`⚠️ Skills directory not found: ${this.skillsDir}`);
-            return "";
-        }
+  loadSkills(): Map<string, Skill> {
+    const skills = new Map<string, Skill>();
 
-        let prompt = "## Available Skills\n\n";
-        const entries = fs.readdirSync(this.skillsDir, { withFileTypes: true });
+    for (const dir of this.directories) {
+      if (!fs.existsSync(dir)) {
+        console.warn(`[SkillLoader] Directory not found: ${dir}`);
+        continue;
+      }
+
+      try {
+        const entries = fs.readdirSync(dir, { withFileTypes: true });
 
         for (const entry of entries) {
-            if (entry.isDirectory()) {
-                const skillFile = path.join(this.skillsDir, entry.name, 'skill.md');
-                if (fs.existsSync(skillFile)) {
-                    const content = fs.readFileSync(skillFile, 'utf-8');
-                    prompt += `### Skill: ${entry.name}\n${content}\n\n---\n\n`;
-                    console.log(`📚 Loaded skill: ${entry.name}/skill.md`);
-                }
-            } else if (entry.isFile() && entry.name.endsWith('.md')) {
-                const content = fs.readFileSync(path.join(this.skillsDir, entry.name), 'utf-8');
-                prompt += `### Skill: ${entry.name.replace('.md', '')}\n${content}\n\n---\n\n`;
-                console.log(`📚 Loaded skill: ${entry.name}`);
-            }
-        }
+          let skillName: string | null = null;
+          let skillPath: string = path.join(dir, entry.name);
 
-        return prompt;
+          if (entry.isDirectory()) {
+            // Check for SKILL.md inside the directory
+            if (fs.existsSync(path.join(skillPath, 'SKILL.md'))) {
+              skillName = entry.name;
+            }
+          } else if (entry.isFile() && entry.name.endsWith('.skill')) {
+            skillName = entry.name.replace('.skill', '');
+          }
+
+          if (skillName) {
+            console.log(`[SkillLoader] Loading skill '${skillName}' from ${dir}`);
+            skills.set(skillName, { name: skillName, path: skillPath, source: dir });
+          }
+        }
+      } catch (err) {
+        console.error(`[SkillLoader] Error reading directory ${dir}:`, err);
+      }
     }
+    return skills;
+  }
 }

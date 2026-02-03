@@ -1,52 +1,26 @@
 import * as fs from 'fs';
 import * as path from 'path';
-import * as os from 'os';
 
 export class SystemPromptBuilder {
-  private workspacePath: string;
+  private workspaceDir: string;
 
-  constructor(workspacePath: string) {
-    this.workspacePath = workspacePath;
+  constructor(workspaceDir: string) {
+    this.workspaceDir = workspaceDir;
   }
 
-  public buildPrompt(): string {
-    const soul = this.readFile('SOUL.md') || 'You are a helpful AI assistant.';
-    const agents = this.readFile('AGENTS.md') || '';
+  buildPrompt(basePrompt: string): string {
+    const memoryPath = path.join(this.workspaceDir, 'MEMORY.md');
     
-    const memoryContent = this.readFile('MEMORY.md', true);
-    const memorySection = memoryContent ? `\n\n## Memory\n${memoryContent}` : '';
-
-    // Runtime information
-    const runtimeInfo = this.getRuntimeInfo();
-
-    return `
-${soul}
-
-${agents}${memorySection}
-
-## Runtime Context
-${runtimeInfo}
-    `.trim();
-  }
-
-  private readFile(filename: string, silent: boolean = false): string | null {
-    const filePath = path.join(this.workspacePath, filename);
-    if (fs.existsSync(filePath)) {
-      return fs.readFileSync(filePath, 'utf-8');
+    let memoryContent = '';
+    if (fs.existsSync(memoryPath)) {
+      try {
+        const content = fs.readFileSync(memoryPath, 'utf8');
+        memoryContent = `\n\n## Long-Term Memory (MEMORY.md)\n${content}`;
+      } catch (err) {
+        console.warn('Failed to read MEMORY.md', err);
+      }
     }
-    if (!silent) {
-      console.warn(`[SystemPrompt] Warning: File not found: ${filePath}`);
-    }
-    return null;
-  }
 
-  private getRuntimeInfo(): string {
-    const now = new Date();
-    return `
-- Date: ${now.toISOString().split('T')[0]}
-- Time: ${now.toTimeString().split(' ')[0]}
-- OS: ${os.type()} ${os.release()}
-- Workspace: ${this.workspacePath}
-    `.trim();
+    return `${basePrompt}${memoryContent}`;
   }
 }

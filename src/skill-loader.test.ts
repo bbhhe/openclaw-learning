@@ -1,64 +1,56 @@
-import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
+import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 import { SkillLoader } from './skill-loader';
-import fs from 'fs';
-import path from 'path';
-
-// Mock fs and path
-vi.mock('fs');
+import * as fs from 'fs';
+import * as path from 'path';
+import * as os from 'os';
 
 describe('SkillLoader', () => {
-    const mockDir = '/mock/skills';
+  let tempDir: string;
+  let skillDir1: string;
+  let skillDir2: string;
 
-    beforeEach(() => {
-        vi.resetAllMocks();
-    });
+  beforeEach(() => {
+    tempDir = fs.mkdtempSync(path.join(os.tmpdir(), 'skill-loader-test-'));
+    skillDir1 = path.join(tempDir, 'skills1');
+    skillDir2 = path.join(tempDir, 'skills2');
+    fs.mkdirSync(skillDir1);
+    fs.mkdirSync(skillDir2);
+  });
 
-    it('should return empty string if dir does not exist', () => {
-        vi.mocked(fs.existsSync).mockReturnValue(false);
-        const loader = new SkillLoader(mockDir);
-        expect(loader.loadSkills()).toBe('');
-    });
+  afterEach(() => {
+    fs.rmSync(tempDir, { recursive: true, force: true });
+  });
 
-    it('should load skills from flat .md files', () => {
-        vi.mocked(fs.existsSync).mockReturnValue(true);
-        // Mock readdirSync to return Dirent objects (for withFileTypes: true)
-        const mockEntry = {
-            name: 'git.md',
-            isFile: () => true,
-            isDirectory: () => false
-        } as fs.Dirent;
-        
-        vi.mocked(fs.readdirSync).mockReturnValue([mockEntry] as any);
-        vi.mocked(fs.readFileSync).mockReturnValue('Git Skill Content');
+  it('should load skills from multiple directories', () => {
+    // Create mock skills
+    fs.writeFileSync(path.join(skillDir1, 'skill1.skill'), 'content');
+    fs.writeFileSync(path.join(skillDir2, 'skill2.skill'), 'content');
 
-        const loader = new SkillLoader(mockDir);
-        const result = loader.loadSkills();
+    const loader = new SkillLoader([skillDir1, skillDir2]);
+    const skills = loader.loadSkills();
 
-        expect(result).toContain('### Skill: git');
-        expect(result).toContain('Git Skill Content');
-    });
+    expect(skills.size).toBe(2);
+    expect(skills.has('skill1')).toBe(true);
+    expect(skills.has('skill2')).toBe(true);
+    expect(skills.get('skill1')?.source).toBe(skillDir1);
+    expect(skills.get('skill2')?.source).toBe(skillDir2);
+  });
 
-    it('should load skills from subdirectories (skill.md)', () => {
-        vi.mocked(fs.existsSync).mockReturnValue(true); // For main dir and skill.md check
-        
-        const mockEntry = {
-            name: 'weather',
-            isFile: () => false,
-            isDirectory: () => true
-        } as fs.Dirent;
+  it('should handle directories with SKILL.md inside folders', () => {
+    const complexSkillDir = path.join(skillDir1, 'complex-skill');
+    fs.mkdirSync(complexSkillDir);
+    fs.writeFileSync(path.join(complexSkillDir, 'SKILL.md'), 'content');
 
-        vi.mocked(fs.readdirSync).mockReturnValue([mockEntry] as any);
-        vi.mocked(fs.readFileSync).mockReturnValue('Weather Skill Content');
+    const loader = new SkillLoader([skillDir1]);
+    const skills = loader.loadSkills();
 
-        const loader = new SkillLoader(mockDir);
-        const result = loader.loadSkills();
+    expect(skills.has('complex-skill')).toBe(true);
+  });
 
-        expect(result).toContain('### Skill: weather');
-        expect(result).toContain('Weather Skill Content');
-        // Verify path construction
-        expect(fs.readFileSync).toHaveBeenCalledWith(
-            path.join(mockDir, 'weather', 'skill.md'), 
-            'utf-8'
-        );
-    });
+  it('should ignore directories that do not exist', () => {
+    const loader = new SkillLoader([skillDir1, '/non/existent/path']);
+    // Should not throw
+    const skills = loader.loadSkills();
+    expect(skills).toBeDefined();
+  });
 });
