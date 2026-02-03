@@ -10,10 +10,22 @@ import { limitHistory } from './utils';
 import { MAX_HISTORY_TURNS } from './config';
 import { Scheduler } from './scheduler';
 import { ProcessManager } from './process-manager';
+import { ConfigLoader } from './config-loader';
+import { SystemPromptBuilder } from './system-prompt';
 
 const execAsync = promisify(exec);
 const scheduler = new Scheduler();
 const processManager = new ProcessManager();
+
+// --- Configuration & System Prompt ---
+// Initialize ConfigLoader (default workspace: ~/.openclaw-learning)
+const userHome = process.env.HOME || process.cwd();
+const workspacePath = path.join(userHome, '.openclaw-learning');
+const configLoader = new ConfigLoader(workspacePath);
+const config = configLoader.getConfig();
+
+// Initialize SystemPromptBuilder
+const systemPromptBuilder = new SystemPromptBuilder(config.workspacePath);
 
 // --- Express & HTTP Setup ---
 const app = express();
@@ -152,15 +164,16 @@ async function runTool(name: string, args: any): Promise<string> {
     return "Unknown tool";
 }
 
-const router = new ModelRouter();
+const router = new ModelRouter(configLoader);
 const skillLoader = new SkillLoader(path.join(__dirname, 'skills'));
-const skillsPrompt = skillLoader.loadSkills(); // Assuming sync or async handled
+const skillsPrompt = skillLoader.loadSkills();
 
-const SYSTEM_PROMPT = `You are an Agentic AI assistant.
-You have access to 'exec' and 'bash'.
-Don't make assumptions.
-
-${skillsPrompt}`;
+// Combine dynamic system prompt with skills
+// We will generate the base prompt dynamically now
+function getFullSystemPrompt(): string {
+    const basePrompt = systemPromptBuilder.buildPrompt();
+    return `${basePrompt}\n\n## Tools & Skills\n${skillsPrompt}`;
+}
 
 // --- Session Management ---
 interface Session {
@@ -184,10 +197,18 @@ wss.on('connection', (ws) => {
     const sessionKey = "main";
     let session = sessions.get(sessionKey);
     
+    // Always refresh system prompt on new connection (or start of session) to capture file changes
+    const currentSystemPrompt = getFullSystemPrompt();
+
     if (!session) {
-        session = { history: [{ role: 'system', content: SYSTEM_PROMPT }] };
+        session = { history: [{ role: 'system', content: currentSystemPrompt }] };
         sessions.set(sessionKey, session);
     } else {
+        // Update the system prompt if it's the first message
+        if (session.history.length > 0 && session.history[0].role === 'system') {
+             session.history[0].content = currentSystemPrompt;
+        }
+        
         const lastMsg = session.history[session.history.length - 1];
         if (lastMsg && lastMsg.role === 'assistant') {
             ws.send(JSON.stringify({ type: 'message', content: `[Resumed]: ${lastMsg.content}` }));
@@ -249,4 +270,6 @@ async function processTurn(ws: WebSocket, session: Session) {
 server.listen(PORT, () => {
     console.log(`🚀 Gateway running on http://localhost:${PORT}`);
     console.log(`📡 WebSocket ready on ws://localhost:${PORT}`);
+    console.log(`📂 Workspace: ${config.workspacePath}`);
+    console.log(`🤖 Model: ${config.model.modelName} (${config.model.provider})`);
 });

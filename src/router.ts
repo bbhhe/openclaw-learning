@@ -1,8 +1,31 @@
-import { modelPool, ModelProvider } from './config';
+import { ModelProvider } from './config';
 import { logger } from './logger';
+import { ConfigLoader, ModelConfig } from './config-loader';
 
 export class ModelRouter {
-    private pool: ModelProvider[] = modelPool;
+    private pool: ModelProvider[] = [];
+    private configLoader: ConfigLoader;
+
+    constructor(configLoader: ConfigLoader) {
+        this.configLoader = configLoader;
+        this.reloadConfig();
+    }
+
+    public reloadConfig() {
+        const config = this.configLoader.getConfig();
+        const modelConfig = config.model;
+
+        // Map the single model config to the pool format
+        // In the future, we could support an array of models in config.json
+        this.pool = [{
+            id: modelConfig.provider,
+            baseUrl: modelConfig.baseUrl || 'https://api.openai.com/v1',
+            apiKey: modelConfig.apiKey,
+            modelName: modelConfig.modelName,
+            status: 'healthy'
+        }];
+        logger.info(`[Router] Loaded model configuration for provider: ${modelConfig.provider}`);
+    }
 
     private getHealthyProvider(): ModelProvider | null {
         const now = Date.now();
@@ -30,7 +53,6 @@ export class ModelRouter {
         provider.busyUntil = Date.now() + cooldownMs;
     }
 
-    // 修改点 1: 增加 tools 参数，返回完整对象
     async chat(messages: any[], tools?: any[]): Promise<any> {
         const MAX_RETRIES = 5;
         let lastError: Error | null = null;
@@ -41,7 +63,7 @@ export class ModelRouter {
             if (!provider) {
                 const anyBusy = this.pool.some(p => p.status === 'busy');
                 if (anyBusy) throw new Error("🔥 All providers are busy. Please wait.");
-                throw new Error("🔥 All providers are down!");
+                throw new Error("🔥 All providers are down! Check your config.json.");
             }
 
             try {
@@ -57,7 +79,6 @@ export class ModelRouter {
         throw lastError;
     }
 
-    // 新增: 流式对话方法
     async *chatStream(messages: any[], tools?: any[]): AsyncGenerator<string, void, unknown> {
         const MAX_RETRIES = 5;
         let lastError: Error | null = null;
@@ -68,12 +89,11 @@ export class ModelRouter {
             if (!provider) {
                 const anyBusy = this.pool.some(p => p.status === 'busy');
                 if (anyBusy) throw new Error("🔥 All providers are busy.");
-                throw new Error("🔥 All providers are down!");
+                throw new Error("🔥 All providers are down! Check your config.json.");
             }
 
             try {
                 logger.info(`[Router] 🔄 Stream Attempt ${attempt} using ${provider.id}...`);
-                // 调用流式接口
                 yield* this.callProviderStream(provider, messages, tools);
                 return;
             } catch (error: any) {
@@ -91,7 +111,7 @@ export class ModelRouter {
         const payload: any = {
             model: provider.modelName,
             messages: messages,
-            stream: true // 开启流式
+            stream: true
         };
         if (tools && tools.length > 0) payload.tools = tools;
 
@@ -118,7 +138,7 @@ export class ModelRouter {
             
             buffer += decoder.decode(value, { stream: true });
             const lines = buffer.split('\n');
-            buffer = lines.pop() || ""; // 保留未完整的行
+            buffer = lines.pop() || "";
 
             for (const line of lines) {
                 const trimmed = line.trim();
@@ -137,7 +157,6 @@ export class ModelRouter {
         }
     }
 
-    // 修改点 2: 传递 tools
     private async callProvider(provider: ModelProvider, messages: any[], tools?: any[]): Promise<any> {
         const url = `${provider.baseUrl.replace(/\/+$/, '')}/chat/completions`;
         
@@ -152,11 +171,10 @@ export class ModelRouter {
         }
 
         logger.debug(`[API Request] URL: ${url}`);
-        // 不要打印完整的 payload，因为可能有敏感信息或太长，只打印关键信息
         logger.debug(`[API Request] Model: ${provider.modelName}, MsgCount: ${messages.length}`);
 
         const controller = new AbortController();
-        const timeoutId = setTimeout(() => controller.abort(), 60000); // 60秒超时
+        const timeoutId = setTimeout(() => controller.abort(), 60000);
 
         try {
             const start = Date.now();
