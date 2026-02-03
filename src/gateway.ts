@@ -198,12 +198,12 @@ scheduler.on('trigger', (task) => {
     });
 });
 
-wss.on('connection', (ws) => {
+wss.on('connection', async (ws) => {
     console.log("🔌 New connection established");
     const sessionKey = "main";
     
     // Load history from disk
-    let history = sessionManager.loadSession(sessionKey);
+    let history = await sessionManager.loadSession(sessionKey);
     
     // Refresh System Prompt
     const currentSystemPrompt = getFullSystemPrompt();
