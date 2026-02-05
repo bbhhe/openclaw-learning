@@ -30,8 +30,16 @@
         <div class="message system">Connected to OpenClaw Server...</div>
     </div>
     <div id="input-area">
+        <label for="image-upload" style="cursor: pointer; padding: 10px; color: #666;">
+            📷
+        </label>
+        <input type="file" id="image-upload" accept="image/*" style="display: none;" />
         <input type="text" id="message-input" placeholder="输入消息..." />
         <button id="send-btn">发送</button>
+    </div>
+    <div id="preview-area" style="padding: 0 15px; background: white; display: none;">
+        <img id="image-preview" src="" style="max-height: 100px; border-radius: 5px; border: 1px solid #ddd;" />
+        <button id="clear-image" style="background: none; border: none; cursor: pointer; color: red;">❌</button>
     </div>
 
     <script src="app.js?v=2"></script>

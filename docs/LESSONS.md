@@ -29,3 +29,10 @@
     *   `src/skill-loader.ts`: 扫描并读取 `.md` 文件。
     *   `src/skills/`: 技能存放目录。
     *   **System Prompt Injection**: 启动时自动注入技能知识。
+
+## ✅ 第六课：慧眼 (The Eyes)
+**目标**：打破纯文本限制，让 Agent 能“看”到图片。
+*   **挑战**：WebSocket 传输二进制/Base64，OpenAI 格式的消息构造。
+*   **产出**：
+    *   `src/types.ts`: 升级 Message 类型支持 `ContentPart[]`。
+    *   `src/router.ts`: 适配 Vision Model (如 gpt-4o, claude-3.5-sonnet)。

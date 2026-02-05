@@ -248,15 +248,37 @@ wss.on('connection', async (ws) => {
 
     ws.on('message', async (rawMessage) => {
         let text = rawMessage.toString();
+        let userMsg: any = { role: 'user', content: text };
+
         try {
             const json = JSON.parse(text);
-            if (json.type === 'message') text = json.content;
-        } catch (e) {}
+            
+            // Handle Vision Protocol
+            if (json.type === 'message') {
+                if (json.images && Array.isArray(json.images) && json.images.length > 0) {
+                    const contentParts: any[] = [];
+                    if (json.content) {
+                        contentParts.push({ type: 'text', text: json.content });
+                    }
+                    for (const img of json.images) {
+                        contentParts.push({
+                            type: 'image_url',
+                            image_url: { url: img } // Expecting data URI or URL
+                        });
+                    }
+                    userMsg = { role: 'user', content: contentParts };
+                } else {
+                    // Plain text fallback
+                    userMsg = { role: 'user', content: json.content };
+                }
+            }
+        } catch (e) {
+            // Not JSON, treat as plain text string
+        }
 
-        logger.info(`👂 User: ${text}`);
-        logger.debug(`Raw message received: ${rawMessage}`);
+        logger.info(`👂 User: ${JSON.stringify(userMsg.content).substring(0, 50)}...`);
+        logger.debug(`Raw message received: ${rawMessage.toString().substring(0, 100)}...`);
         
-        const userMsg = { role: 'user', content: text };
         sessionManager.appendMessage(sessionKey, userMsg);
         history.push(userMsg);
         history = limitHistory(history, MAX_HISTORY_TURNS);
