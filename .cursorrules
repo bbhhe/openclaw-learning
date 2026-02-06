@@ -1,0 +1,18 @@
+# Trae Project Rules
+
+## Development Workflow
+1. **Plan**: Before any code change, output a brief plan of attack.
+2. **Test First**: New features or bug fixes *must* have a corresponding `.test.ts` file in `src/core/__tests__` or alongside the source.
+3. **Trace LLM Calls**: Every LLM request must be logged with its prompt and raw response (use the existing `logger.ts`).
+
+## Coding Standards
+- **Types**: No `any`. Define interfaces for all LLM responses.
+- **Error Handling**: Use `try/catch` around all network/LLM calls. Provide meaningful error messages for the Swarm UI.
+- **Dependency Injection**: Use the project's DI pattern (if applicable) or ensure modularity so components can be tested in isolation.
+
+## Swarm Mode Specifics
+- The issue is "no LLM message returned". 
+- Check `src/swarm_interactive.ts` for:
+    - Proper async/await handling.
+    - Model alias resolution (ensure the model used exists in OpenClaw config).
+    - Event emitter listeners (are they actually firing?).
