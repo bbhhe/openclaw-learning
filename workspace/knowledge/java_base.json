@@ -1,0 +1,33 @@
+{
+  "courseId": "java-basic",
+  "version": "1.0.0",
+  "nodes": [
+    {
+      "id": "syntax-1",
+      "title": "Java 基础语法",
+      "description": "变量、数据类型、运算符",
+      "dependencies": [],
+      "difficulty": 1,
+      "estimatedMinutes": 60,
+      "tags": ["basics"]
+    },
+    {
+      "id": "oop-1",
+      "title": "面向对象核心",
+      "description": "封装、继承、多态",
+      "dependencies": ["syntax-1"],
+      "difficulty": 3,
+      "estimatedMinutes": 120,
+      "tags": ["oop", "core"]
+    },
+    {
+      "id": "collections-1",
+      "title": "集合框架",
+      "description": "List, Set, Map 深度解析",
+      "dependencies": ["oop-1"],
+      "difficulty": 3,
+      "estimatedMinutes": 90,
+      "tags": ["collections"]
+    }
+  ]
+}
